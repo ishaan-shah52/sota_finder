@@ -1,0 +1,17 @@
+[
+  {
+    "dataset": "ZZU pECG",
+    "dataset_paper": "A Pediatric ECG Database with Disease Diagnosis Covering 11,643 Children",
+    "sota_paper": "A Benchmark Study of Deep Learning Methods for Multi-Label Pediatric Electrocardiogram-Based Cardiovascular Disease Classification"
+  },
+  {
+    "dataset": "DREAMT",
+    "dataset_paper": "DREAMT: Dataset for Real-time sleep stage EstimAtion using Multisensor wearable Technology",
+    "sota_paper": "Addressing Wearable Sleep Tracking Inequity: A New Dataset and Novel Methods for a Population with Sleep Disorders"
+  },
+  {
+    "dataset": "FACED",
+    "dataset_paper": "FACED: Finer-grained Affective Computing EEG Dataset (Emotion Recognition)",
+    "sota_paper": "CSBrain: A Cross-scale Spatiotemporal Brain Foundation Model for EEG Decoding"
+  }
+]

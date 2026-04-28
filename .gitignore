@@ -1,0 +1,36 @@
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# Local AI assistant/tooling state
+.claude/
+CLAUDE.md
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Python caches and build output
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+dist/
+build/
+
+# Generated reports and local artifacts
+outputs/
+*.csv
+*.log
+*.tmp
+*.bak
+*.swp
+Thumbs.db
+.DS_Store
+=*

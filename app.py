@@ -310,7 +310,9 @@ if search and dataset.strip():
 
     st.info(
         "Fields are extracted automatically from titles, abstracts, and full paper text where available. "
-        "Fields marked *not found* must be verified directly in the paper. "
+        "Treat every extracted detail as a lead, not a final answer: open the real PDF or paper "
+        "and verify the metric, split, dataset use, preprocessing, and SOTA claim before citing it. "
+        "The web app can miss or misread details, including fields it does not mark as *not found*. "
         "Never compare papers across different metrics or split types.",
         icon="⚠️",
     )

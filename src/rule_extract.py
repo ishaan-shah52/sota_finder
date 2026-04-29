@@ -147,6 +147,23 @@ _MODEL_PATTERNS: list[tuple[re.Pattern, str]] = [
     (re.compile(r"\bdeep[\s\-]neural[\s\-]net\w*|\bdnn\b", re.I), "DNN"),
 ]
 
+_FOUNDATION_MODEL_RE = re.compile(
+    r"\bfoundation[\s\-]+models?\b"
+    r"|\b(?:brain|eeg|ecg|physio|biomedical|clinical)[\s\-]+foundation[\s\-]+models?\b"
+    r"|\b(?:large|generalist|pretrained|self[\s\-]supervised)[\s\-]+"
+    r"(?:brain|eeg|ecg|physio|physiological|biomedical)[\s\-]+models?\b"
+    r"|\b(?:pretrain\w*|self[\s\-]supervised)[^.]{0,120}\b(?:downstream|fine[\s\-]?tun\w*|zero[\s\-]?shot|few[\s\-]?shot)\b"
+    r"|\b(?:FEMBA|CSBrain|LaBraM|BIOT|EEGPT|BrainBERT|NeuroGPT|Neuro-GPT|BRANT)\b"
+    r"|\b[A-Z][A-Za-z0-9]*Brain\b",
+    re.I,
+)
+
+
+def _extract_foundation_model_status(p: PaperRecord, text: str) -> str:
+    model_text = " ".join([p.model_name, *p.models_compared])
+    full_text = f"{text} {model_text} {p.source_snippet}"
+    return "yes" if _FOUNDATION_MODEL_RE.search(full_text) else "no"
+
 # ---------------------------------------------------------------------------
 # Split type
 # ---------------------------------------------------------------------------
@@ -570,6 +587,9 @@ def enrich_records(papers: list[PaperRecord]) -> list[PaperRecord]:
                 if pat.search(full_text):
                     updates["model_name"] = name
                     break
+
+        if p.foundation_model == UNKNOWN:
+            updates["foundation_model"] = _extract_foundation_model_status(p, full_text)
 
         if p.split_type == UNKNOWN:
             st = _extract_split_type(full_text)

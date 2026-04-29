@@ -34,6 +34,9 @@ class PaperRecord(BaseModel):
     # Model
     model_name: str = UNKNOWN
     models_compared: List[str] = []  # baselines listed in the paper
+    # "yes" if the candidate is explicitly about/evaluates a foundation model,
+    # "no" if no foundation-model signal was found, or UNKNOWN before extraction.
+    foundation_model: str = UNKNOWN
 
     # Results
     metric_name: str = UNKNOWN
@@ -75,4 +78,12 @@ class PaperRecord(BaseModel):
         allowed = {"subject-wise", "random-window", "mixed", UNKNOWN}
         if v not in allowed:
             raise ValueError(f"split_type must be one of {allowed}, got {v!r}")
+        return v
+
+    @field_validator("foundation_model")
+    @classmethod
+    def validate_foundation_model(cls, v: str) -> str:
+        allowed = {"yes", "no", UNKNOWN}
+        if v not in allowed:
+            raise ValueError(f"foundation_model must be one of {allowed}, got {v!r}")
         return v

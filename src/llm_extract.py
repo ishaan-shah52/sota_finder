@@ -28,6 +28,7 @@ emotion recognition / motor imagery classification — or UNKNOWN",
   "metric_name": "e.g. accuracy / F1 / macro-F1 / kappa / AUC — or UNKNOWN",
   "metric_value": <number 0-100 representing percentage, or "UNKNOWN">,
   "model_name": "e.g. Transformer / EEGNet / LSTM / CNN / ResNet / SVM — or UNKNOWN",
+  "foundation_model": "yes if the paper is explicitly about or evaluates a foundation model, no if it is not, or UNKNOWN",
   "modalities": ["EEG","ECG","EMG","PPG","fMRI","ECoG","EDA","IMU","PSG"] \
 (subset that applies, or []),
   "cross_validation": "e.g. 10-fold subject-wise / LOSO / leave-one-subject-out \
@@ -193,6 +194,14 @@ def llm_enrich_records(papers: list[PaperRecord]) -> list[PaperRecord]:
 
         if paper.model_name == UNKNOWN and _val(ext.get("model_name")):
             updates["model_name"] = str(ext["model_name"])
+
+        if (
+            ext.get("foundation_model") == "yes"
+            and paper.foundation_model != "yes"
+        ) or (
+            paper.foundation_model == UNKNOWN and ext.get("foundation_model") == "no"
+        ):
+            updates["foundation_model"] = ext["foundation_model"]
 
         if not paper.modalities and isinstance(ext.get("modalities"), list):
             mods = [m for m in ext["modalities"] if isinstance(m, str) and m]

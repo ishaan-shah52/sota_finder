@@ -137,6 +137,10 @@ def _notion_text(p) -> str:
     mv = f"{p.metric_value:.2f}%" if isinstance(p.metric_value, float) else "not found"
     mods = ", ".join(p.modalities) if p.modalities else "not found"
     prep = ", ".join(p.preprocessing_steps) if p.preprocessing_steps else "not found"
+    foundation = {
+        "yes": "Foundation model",
+        "no": "Not a foundation model",
+    }.get(getattr(p, "foundation_model", UNKNOWN), "not found")
 
     metric_line = p.metric_name if p.metric_name != UNKNOWN else "not found"
     if isinstance(p.metric_value, float):
@@ -157,12 +161,25 @@ def _notion_text(p) -> str:
         f"Task: {p.task if p.task != UNKNOWN else 'not found'}",
         f"Metric: {metric_line}",
         f"Model: {p.model_name if p.model_name != UNKNOWN else 'not found'}",
+        f"Foundation model tag: {foundation}",
         f"Modalities: {mods}",
         f"Cross-validation: {p.cross_validation if p.cross_validation != UNKNOWN else 'not found'}",
         f"Data split: {split_str}",
         f"Preprocessing: {prep}",
         f"Paper URL: {p.paper_url if p.paper_url != UNKNOWN else 'not found'}",
     ])
+
+
+def _enrich_paper_with_pdf(p, pdf_text: str, use_llm: bool):
+    """Return a paper updated with text extracted from a manually uploaded PDF."""
+    enriched = p.model_copy(update={
+        "notes": (p.notes or "") + f" FullText: {pdf_text[:25_000]}"
+    })
+    enriched = enrich_records([enriched])[0]
+    enriched = apply_red_flags([enriched])[0]
+    if use_llm:
+        enriched = llm_enrich_records([enriched])[0]
+    return enriched
 
 # ---------------------------------------------------------------------------
 # Search & display
@@ -325,6 +342,9 @@ if search and dataset.strip():
         "RELATED WORK ONLY":     "🔴 RELATED WORK ONLY",
     }
 
+    if "pdf_enrichments" not in st.session_state:
+        st.session_state.pdf_enrichments = {}
+
     # Paper cards
     for rank, p in enumerate(candidates, start=1):
         # Use PDF-uploaded version if available
@@ -385,6 +405,37 @@ if search and dataset.strip():
                     min(filled / total, 1.0),
                     text=f"Completeness: {filled}/{total} fields auto-filled",
                 )
+                uploaded_pdf = st.file_uploader(
+                    "Upload PDF",
+                    type=["pdf"],
+                    accept_multiple_files=False,
+                    key=f"card_pdf_upload_{dataset}_{rank}",
+                    help=(
+                        "Upload this paper's PDF if you accessed it through a "
+                        "school, library, or publisher login."
+                    ),
+                )
+                if uploaded_pdf is not None:
+                    file_key = f"{dataset}__{p.title}__{uploaded_pdf.name}"
+                    if file_key in st.session_state.pdf_enrichments:
+                        st.success("PDF processed")
+                    else:
+                        with st.spinner("Reading uploaded PDF..."):
+                            try:
+                                pdf_text = pdf_text_from_file(uploaded_pdf.read())
+                            except Exception as e:
+                                st.error(f"Could not read PDF: {e}")
+                                pdf_text = ""
+
+                        if pdf_text:
+                            with st.spinner("Updating this paper..."):
+                                enriched = _enrich_paper_with_pdf(p, pdf_text, _has_llm)
+                            st.session_state.pdf_enrichments[p.title] = enriched
+                            st.session_state.pdf_enrichments[file_key] = enriched
+                            st.success("Updated from PDF")
+                            st.rerun()
+                        else:
+                            st.error("Could not extract text from this PDF.")
 
             # Key metrics row — all numeric metrics found in the text
             paper_text = ""
@@ -414,6 +465,12 @@ if search and dataset.strip():
             c2.markdown(_field_md("Metric (primary)", metric_display))
             c3.markdown(_field_md("Model", p.model_name))
             c4.markdown(_field_md("Cross-validation", p.cross_validation))
+
+            foundation_label = {
+                "yes": "Foundation model",
+                "no": "Not a foundation model",
+            }.get(getattr(p, "foundation_model", UNKNOWN), "Foundation model status unknown")
+            st.caption(f"Tag: {foundation_label}")
 
             # Field grid — row 2: modalities / data split / preprocessing
             c5, c6, c7 = st.columns(3)
@@ -487,9 +544,6 @@ if search and dataset.strip():
             "from the full text and update that paper's card above."
         )
 
-        if "pdf_enrichments" not in st.session_state:
-            st.session_state.pdf_enrichments = {}
-
         uploaded_pdfs = st.file_uploader(
             "Upload one or more PDFs",
             type=["pdf"],
@@ -549,14 +603,8 @@ if search and dataset.strip():
 
             if st.button(f"Process '{uf.name}'", key=f"btn__{file_key}"):
                 matched = next(p for p in candidates if p.title == selected)
-                enriched = matched.model_copy(update={
-                    "notes": (matched.notes or "") + f" FullText: {pdf_text[:25_000]}"
-                })
                 with st.spinner("Re-extracting fields from full text…"):
-                    enriched = enrich_records([enriched])[0]
-                    enriched = apply_red_flags([enriched])[0]
-                    if _has_llm:
-                        enriched = llm_enrich_records([enriched])[0]
+                    enriched = _enrich_paper_with_pdf(matched, pdf_text, _has_llm)
 
                 st.session_state.pdf_enrichments[selected] = enriched
                 # Also cache under the file key so we don't reprocess

@@ -44,6 +44,17 @@ def test_invalid_split_type():
         PaperRecord(title="Test", split_type="stratified-random")
 
 
+def test_valid_foundation_model():
+    for tag in ("yes", "no", UNKNOWN):
+        p = PaperRecord(title="Test", foundation_model=tag)
+        assert p.foundation_model == tag
+
+
+def test_invalid_foundation_model():
+    with pytest.raises(ValidationError):
+        PaperRecord(title="Test", foundation_model="maybe")
+
+
 def test_list_fields_default_empty():
     p = PaperRecord(title="Test")
     assert p.datasets_used == []

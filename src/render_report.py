@@ -21,7 +21,7 @@ CSV_FIELDS = [
     "train_split", "val_split", "test_split",
     "cross_validation", "split_type",
     "preprocessing_steps", "modalities",
-    "model_name", "models_compared",
+    "model_name", "models_compared", "foundation_model",
     "metric_name", "metric_value", "result_scope",
     "notes", "confidence", "source_snippet",
     "sota_category", "confidence_score", "red_flags",
@@ -68,6 +68,10 @@ def _paper_block(paper: PaperRecord, idx: int) -> str:
     baselines = (
         ", ".join(paper.models_compared) if paper.models_compared else UNKNOWN
     )
+    foundation_tag = {
+        "yes": "Foundation model",
+        "no": "Not a foundation model",
+    }.get(paper.foundation_model, UNKNOWN)
 
     split_info = []
     if paper.train_split != UNKNOWN:
@@ -109,6 +113,7 @@ def _paper_block(paper: PaperRecord, idx: int) -> str:
         f"- **CV:** {paper.cross_validation}",
         f"- **Split type:** {paper.split_type}",
         f"- **Model:** {paper.model_name}",
+        f"- **Foundation model tag:** {foundation_tag}",
         f"- **Baselines compared:** {baselines}",
         f"- **Metric:** {paper.metric_name} = **{metric_str}**",
         f"- **Result scope:** {paper.result_scope}",
@@ -150,9 +155,9 @@ def _group_table(group: ComparisonGroup) -> str:
 
     rows: List[str] = []
     rows.append(
-        f"| # | Title | Year | Model | {group.metric} | Result Scope | Split Type | Confidence |"
+        f"| # | Title | Year | Model | Foundation Model | {group.metric} | Result Scope | Split Type | Confidence |"
     )
-    rows.append("|---|-------|------|-------|----------------|--------------|------------|------------|")
+    rows.append("|---|-------|------|-------|------------------|----------------|--------------|------------|------------|")
 
     # Sort by metric value descending where available
     def sort_key(p: PaperRecord):
@@ -165,9 +170,13 @@ def _group_table(group: ComparisonGroup) -> str:
         url = paper.paper_url if paper.paper_url != UNKNOWN else None
         title_md = f"[{paper.title}]({url})" if url else paper.title
         val = f"{paper.metric_value}" if paper.metric_value != UNKNOWN else "—"
+        foundation = {
+            "yes": "Yes",
+            "no": "No",
+        }.get(paper.foundation_model, UNKNOWN)
         rows.append(
             f"| {i} | {title_md} | {paper.year} | {paper.model_name} "
-            f"| {val} | {paper.result_scope} | {paper.split_type} | {paper.confidence} |"
+            f"| {foundation} | {val} | {paper.result_scope} | {paper.split_type} | {paper.confidence} |"
         )
     return "\n".join(rows)
 

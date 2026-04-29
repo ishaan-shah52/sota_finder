@@ -219,7 +219,7 @@ def _has_dataset_name_signal(text: str, dataset_name: str, full_name: str = "") 
     if not text:
         return False
 
-    if _is_acronym(dataset_name):
+    if dataset_name and _is_acronym(dataset_name):
         # Prefer exact-case acronym evidence. Case-insensitive matching turns
         # common-word dataset names like DREAMT/FACED into many false positives,
         # so lowercase mentions only count when they appear near dataset context.
@@ -236,7 +236,7 @@ def _has_dataset_name_signal(text: str, dataset_name: str, full_name: str = "") 
                 window,
             ):
                 return True
-    else:
+    elif dataset_name:
         haystack_lower = text.lower()
         needle = dataset_name.lower()
         if needle in haystack_lower:
@@ -290,6 +290,93 @@ def _expanded_dataset_queries(dataset_name: str) -> list[str]:
             f"{dataset_name} affective computing dataset",
         ])
     return list(dict.fromkeys(q for q in queries if q.strip()))
+
+
+def _dataset_key(name: str) -> str:
+    """Normalize dataset names/aliases for curated anchors."""
+    return re.sub(r"[^a-z0-9]+", "", name.lower())
+
+
+_CURATED_DATASET_ANCHORS: dict[str, dict] = {
+    # ISRUC's dataset access page is separate from the Elsevier paper DOI.
+    # Keep the access URL in paper_url because the app labels this field as
+    # "Access / download dataset" in the dataset-paper panel.
+    "isruc": {
+        "title": "ISRUC-Sleep: A comprehensive public dataset for sleep researchers",
+        "authors": ["Sirvan Khalighi", "Teresa Sousa", "Jose Moutinho Santos", "Urbano Nunes"],
+        "author_ids": [],
+        "venue": "Computer Methods and Programs in Biomedicine",
+        "year": 2016,
+        "doi": "10.1016/j.cmpb.2015.10.013",
+        "paper_url": "https://sleeptight.isr.uc.pt/",
+        "openalex_id": None,
+        "citation_count": 0,
+        "pwc_listed": False,
+        "stats": {
+            "subjects": "118",
+            "channels": "",
+            "duration": "",
+            "size": "",
+            "files": "",
+            "labels": ["Wake", "N1", "N2", "N3", "REM"],
+            "split": "",
+        },
+    },
+}
+
+_CURATED_DATASET_ALIASES: dict[str, str] = {
+    _dataset_key(alias): "isruc"
+    for alias in (
+        "ISRUC",
+        "ISRUC-Sleep",
+        "ISRUC Sleep",
+        "ISRUC Sleep Dataset",
+        "ISRUC-SLEEP",
+        "ISRUC-S1",
+        "ISRUC-SG1",
+        "ISRUC-S2",
+        "ISRUC-SG2",
+        "ISRUC-S3",
+        "ISRUC-SG3",
+    )
+}
+
+
+def _curated_dataset_anchor(
+    dataset_name: str,
+    full_name: str | None = None,
+    modalities: list[str] | None = None,
+) -> dict | None:
+    """Return a known dataset-paper/access anchor when public search is unreliable."""
+    canonical = _CURATED_DATASET_ALIASES.get(_dataset_key(dataset_name))
+    if not canonical:
+        return None
+
+    anchor = dict(_CURATED_DATASET_ANCHORS[canonical])
+    missing_flags: set[str] = set()
+    if full_name:
+        expected_title = f"{anchor['title']} {full_name}".lower()
+        if not _has_dataset_name_signal(expected_title, "", full_name):
+            missing_flags.add("full_name")
+    if modalities:
+        keywords = _modality_keywords_flat(modalities)
+        searchable = f"{anchor['title']} {anchor['venue']} PSG polysomnography sleep EEG EOG EMG"
+        if not _has_modality_signal(searchable, keywords):
+            missing_flags.add("modality")
+
+    return {
+        "found": True,
+        **anchor,
+        "full_name": full_name or "",
+        "modality_verified": "modality" not in missing_flags,
+        "missing_flags": missing_flags,
+        "_pwc_html": None,
+        "_candidate_ranking": [{
+            "title": anchor["title"],
+            "score": 100.0,
+            "source": "curated dataset anchor",
+        }],
+    }
 
 
 def _looks_like_dataset_record(title: str, text: str, dataset_name: str, full_name: str = "") -> bool:
@@ -688,6 +775,11 @@ def find_dataset_paper(
         "openalex_id": None, "citation_count": 0, "pwc_listed": False,
         "full_name": full_name or "",
     }
+
+    curated_anchor = _curated_dataset_anchor(dataset_name, full_name, modalities)
+    if curated_anchor:
+        print(f"  Dataset paper selected (curated anchor): \"{curated_anchor['title'][:65]}\"")
+        return curated_anchor
 
     is_acronym = _is_acronym(dataset_name)
     name = dataset_name.lower()
